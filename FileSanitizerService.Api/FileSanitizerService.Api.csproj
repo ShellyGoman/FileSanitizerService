@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>FileSanitizerService</RootNamespace>
+    <RootNamespace>FileSanitizerService.Api</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +13,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FileSanitizerService.Core\FileSanitizerService.Core.csproj" />
+    <ProjectReference Include="..\FileSanitizerService.Infrastructure\FileSanitizerService.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Middlewares\" />
   </ItemGroup>
 
 </Project>
