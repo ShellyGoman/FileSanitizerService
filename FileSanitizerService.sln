@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileSanitizerService.Tests"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileSanitizerService.Core", "FileSanitizerService.Core\FileSanitizerService.Core.csproj", "{1F97DB77-248F-4947-B172-BAF0AB23D2A2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileSanitizerService.Infrastructure", "FileSanitizerService.Infrastructure\FileSanitizerService.Infrastructure.csproj", "{9B3D37C1-3D99-4B3B-97C8-2B7A6774F241}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{1F97DB77-248F-4947-B172-BAF0AB23D2A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1F97DB77-248F-4947-B172-BAF0AB23D2A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1F97DB77-248F-4947-B172-BAF0AB23D2A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B3D37C1-3D99-4B3B-97C8-2B7A6774F241}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B3D37C1-3D99-4B3B-97C8-2B7A6774F241}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B3D37C1-3D99-4B3B-97C8-2B7A6774F241}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B3D37C1-3D99-4B3B-97C8-2B7A6774F241}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

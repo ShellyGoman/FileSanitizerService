@@ -109,6 +109,7 @@ publish/
 # Azure Functions
 bin/
 obj/
+.tmp-build/
 
 # Local environment files
 .env
@@ -116,3 +117,7 @@ obj/
 
 # JetBrains Rider
 *.sln.iml
+
+CLAUDE.md
+CURSOR.md
+PLAN.md
