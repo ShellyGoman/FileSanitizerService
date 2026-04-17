@@ -1,5 +1,6 @@
 using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.Models;
+using FileSanitizerService.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 
 namespace FileSanitizerService.Core.Services;
@@ -64,7 +65,7 @@ public sealed class SanitizationService : ISanitizationService
         if (format == FileFormat.Unknown)
         {
             _logger.LogError("File format could not be detected — rejecting request");
-            throw new ArgumentException("Unsupported or unrecognized file format.");
+            throw new UnsupportedFormatException();
         }
 
         _logger.LogInformation("Detected format {Format} — routing to sanitizer", format);
@@ -73,7 +74,7 @@ public sealed class SanitizationService : ISanitizationService
         if (sanitizer is null)
         {
             _logger.LogError("No sanitizer registered for format {Format}", format);
-            throw new ArgumentException($"No sanitizer found for format '{format}'.");
+            throw new SanitizerConfigurationException($"No sanitizer registered for detected format '{format}'.");
         }
 
         _logger.LogInformation("Starting sanitization process for file '{FileName}'", fileName ?? "unknown");

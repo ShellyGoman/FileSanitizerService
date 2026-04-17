@@ -1,3 +1,5 @@
+using System.Buffers;
+using FileSanitizerService.Core.Exceptions;
 using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.Models;
 
@@ -5,7 +7,7 @@ namespace FileSanitizerService.Core.Formats.Abc;
 
 public sealed class AbcFileSanitizer : IFileSanitizer
 {
-    private const int ReadBufferSize = 4096;
+    private const int ReadBufferSize = 4096; // 4kb
     private const int BlockSize = 3;
     private const byte BlockStartByte = (byte)'A';
     private const byte BlockEndByte = (byte)'C';
@@ -31,44 +33,46 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         await output.WriteAsync(HeaderBytes, ct);
 
         var state = new ParserState();
-        var readBuf = new byte[ReadBufferSize];
-        int bytesRead;
-        
-        while ((bytesRead = await input.ReadAsync(readBuf, ct)) > 0)
+        var currentChunkBytes = new byte[ReadBufferSize];
+        var outputWriter = new ArrayBufferWriter<byte>(ReadBufferSize * 2);
+        int currentChunkSize;
+
+        while ((currentChunkSize = await input.ReadAsync(currentChunkBytes, ct)) > 0)
         {
-            await ProcessChunkAsync(readBuf, bytesRead, state, output, ct);
+            ProcessChunk(currentChunkBytes, currentChunkSize, state, outputWriter);
+            
+            await output.WriteAsync(outputWriter.WrittenMemory, ct);
+            outputWriter.ResetWrittenCount();
         }
 
         EnsureCompletedState(state);
         await output.WriteAsync(FooterBytes, ct);
     }
-    
+
     // Processes one read buffer chunk and rejects trailing bytes after a completed footer.
-    private static async Task ProcessChunkAsync(
-        byte[] buffer,
-        int bytesRead,
+    private static void ProcessChunk(
+        byte[] chunkBytes,
+        int currentChunkSize,
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (state.IsFooterFullyRead)
-            throw new InvalidOperationException("Unexpected bytes after footer '789'.");
+            throw new InvalidFileStructureException("Unexpected bytes after footer '789'.");
 
-        for (var index = 0; index < bytesRead; index++)
+        for (var index = 0; index < currentChunkSize; index++)
         {
-            await ProcessByteAsync(buffer[index], state, output, ct);
+            ProcessByte(chunkBytes[index], state, outputWriter);
 
-            if (state.IsFooterFullyRead && index + 1 < bytesRead)
-                throw new InvalidOperationException("Unexpected bytes after footer '789'.");
+            if (state.IsFooterFullyRead && index + 1 < currentChunkSize)
+                throw new InvalidFileStructureException("Unexpected bytes after footer '789'.");
         }
     }
 
     // Routes each byte to footer, newline, or data-block handling.
-    private static async Task ProcessByteAsync(
+    private static void ProcessByte(
         byte currentByte,
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (currentByte == CarriageReturn)
         {
@@ -79,12 +83,12 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         if (state.SeenCarriageReturn)
         {
             state.SeenCarriageReturn = false;
-            
+
             // after \r we expect to see \n only
             if (currentByte != LineFeed)
-                throw new InvalidOperationException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
+                throw new InvalidFileStructureException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
 
-            await ProcessNewLineAsync(state, output, ct);
+            ProcessNewLine(state, outputWriter);
             return;
         }
 
@@ -96,11 +100,11 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         if (currentByte == LineFeed)
         {
-            await ProcessNewLineAsync(state, output, ct);
+            ProcessNewLine(state, outputWriter);
             return;
         }
 
-        await ProcessDataByteAsync(currentByte, state, output, ct);
+        ProcessDataByte(currentByte, state, outputWriter);
     }
 
     // Decides whether the current byte should be interpreted as part of the footer.
@@ -118,7 +122,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         byte expected = FooterBytes[state.FooterBytesMatchedCount];
         if (currentByte != expected)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Invalid footer: expected '{(char)expected}', got '{(char)currentByte}'.");
         }
 
@@ -128,58 +132,54 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     }
 
     // Validates block boundaries on newline, writes it through, and enables footer detection.
-    private static async Task ProcessNewLineAsync(
+    private static void ProcessNewLine(
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (state.CurrentBlockByteCount != 0)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Invalid ABC file: newline encountered after {state.CurrentBlockByteCount} of {BlockSize} bytes in a block (incomplete A*C block).");
         }
 
-        await output.WriteAsync(NewLineByte, ct);
+        outputWriter.Write(NewLineByte);
         state.ExpectingFooterStartAfterNewLine = true;
     }
 
     // Buffers data bytes into 3-byte blocks and emits each block when complete.
-    private static async Task ProcessDataByteAsync(
+    private static void ProcessDataByte(
         byte currentByte,
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> outputWriter)
     {
         state.ExpectingFooterStartAfterNewLine = false;
         state.CurrentBlockBytes[state.CurrentBlockByteCount++] = currentByte;
 
         // did not create yet the full block with the full length (3)
-        // need to wait fot the rest of the data
+        // need to wait for the rest of the data
         if (state.CurrentBlockByteCount < state.CurrentBlockBytes.Length)
             return;
 
-        await WriteSanitizedBlockAsync(state.CurrentBlockBytes, output, ct);
+        WriteSanitizedBlock(state.CurrentBlockBytes, outputWriter);
         state.CurrentBlockByteCount = 0;
     }
 
     // Validates a full A*C block and writes either the original or replacement block.
-    private static async Task WriteSanitizedBlockAsync(
+    private static void WriteSanitizedBlock(
         byte[] blockBuffer,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (blockBuffer[0] != BlockStartByte || blockBuffer[2] != BlockEndByte)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Invalid block: expected A<byte>C, got " +
                 $"'{(char)blockBuffer[0]}' '{(char)blockBuffer[1]}' '{(char)blockBuffer[2]}'.");
         }
 
         byte dataByte = blockBuffer[1];
-        if (dataByte is >= BenignMinByte and <= BenignMaxByte)
-            await output.WriteAsync(blockBuffer.AsMemory(0, BlockSize), ct);
-        else
-            await output.WriteAsync(ReplacementBlock, ct);
+        outputWriter.Write(dataByte is >= BenignMinByte and <= BenignMaxByte
+            ? blockBuffer.AsSpan(0, BlockSize)
+            : ReplacementBlock);
     }
 
     // Verifies parsing ended in a valid terminal state and raises detailed structural errors.
@@ -189,18 +189,18 @@ public sealed class AbcFileSanitizer : IFileSanitizer
             return;
 
         if (state.SeenCarriageReturn)
-            throw new InvalidOperationException(@"Invalid line ending: file ended with '\r' without trailing '\n'.");
+            throw new InvalidFileStructureException(@"Invalid line ending: file ended with '\r' without trailing '\n'.");
 
         if (state.FooterBytesMatchedCount > 0)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Incomplete footer: file ended after partial footer (read {state.FooterBytesMatchedCount}/{FooterBytes.Length} bytes).");
         }
 
         if (state.CurrentBlockByteCount > 0)
-            throw new InvalidOperationException("File ended mid-block: incomplete A*C block.");
+            throw new InvalidFileStructureException("File ended mid-block: incomplete A*C block.");
 
-        throw new InvalidOperationException("Missing footer: file must end with '\\n789'.");
+        throw new InvalidFileStructureException("Missing footer: file must end with '\\n789'.");
     }
 
     // Keeps incremental parser state so streaming works across

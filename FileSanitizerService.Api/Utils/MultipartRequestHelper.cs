@@ -45,11 +45,7 @@ internal static class MultipartRequestHelper
                 await section.Body.CopyToAsync(Stream.Null, ct);
             }
         }
-        catch (InvalidDataException ex)
-        {
-            throw new ArgumentException("Invalid multipart body.", ex);
-        }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is InvalidDataException or IOException)
         {
             throw new ArgumentException("Invalid multipart body.", ex);
         }
