@@ -5,6 +5,8 @@ namespace FileSanitizerService.Core.Detection;
 
 public sealed class HeaderDetector : IFormatDetector
 {
+    private const byte LineFeed = (byte)'\n';
+    
     private static readonly IReadOnlyList<(FileFormat Format, byte[] Header)> Headers =
     [
         // Keep longest signatures first so CRLF is matched before LF.
@@ -23,7 +25,8 @@ public sealed class HeaderDetector : IFormatDetector
         while (headerBytes.Count < MaxHeaderLength && await stream.ReadAsync(oneByte, ct) > 0)
         {
             headerBytes.Add(oneByte[0]);
-            if (oneByte[0] == (byte)'\n')
+            // assuming all headers last byte is '\n'
+            if (oneByte[0] == LineFeed)
                 break;
         }
 

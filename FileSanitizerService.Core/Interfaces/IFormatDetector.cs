@@ -5,11 +5,9 @@ namespace FileSanitizerService.Core.Interfaces;
 public interface IFormatDetector
 {
     /// <summary>
-    /// Reads just enough bytes from the beginning of <paramref name="stream"/> to identify
-    /// its format and returns the result. The consumed bytes are <b>not</b> returned; callers
-    /// must account for the fact that the stream position has advanced past the header.
-    /// Each <see cref="IFileSanitizer"/> implementation is responsible for re-emitting its
-    /// own header bytes to the output stream.
+    /// Peeks at the start of <paramref name="stream"/> to figure out what file format it is.
+    /// Keep in mind that the header bytes get consumed during detection, so the stream won't
+    /// be at position 0 anymore when this returns.
     /// </summary>
     Task<FormatDetectionResult> DetectAsync(Stream stream, CancellationToken ct = default);
 }
