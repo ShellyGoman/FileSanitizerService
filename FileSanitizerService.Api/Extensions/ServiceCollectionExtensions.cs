@@ -11,7 +11,7 @@ namespace FileSanitizerService.Api.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddFileSanitizerServices(this IServiceCollection services)
+    public static IServiceCollection AddLocalServices(this IServiceCollection services)
     {
         services.AddSingleton<IFormatDetector, HeaderDetector>();
 

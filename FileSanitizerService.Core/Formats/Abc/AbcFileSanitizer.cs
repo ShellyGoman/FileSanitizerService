@@ -19,6 +19,8 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     private static readonly byte[] FooterBytes = "789"u8.ToArray();
     private static readonly byte[] NewLineByte = [LineFeed];
 
+    public AbcFileSanitizer() { }
+
     public FileFormat SupportedFormat => FileFormat.Abc;
 
     // Streams the ABC file, sanitizes each data block,

@@ -6,7 +6,12 @@ namespace FileSanitizerService.Tests.Detection;
 
 public class HeaderDetectorTests
 {
-    private readonly HeaderDetector _sut = new();
+    private readonly HeaderDetector _sut;
+
+    public HeaderDetectorTests()
+    {
+        _sut = new HeaderDetector();
+    }
 
     [Theory]
     [InlineData("123\n")]
