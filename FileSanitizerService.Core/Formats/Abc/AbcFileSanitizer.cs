@@ -32,16 +32,16 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         await output.WriteAsync(HeaderBytes, ct);
 
         var state = new ParserState();
-        var readBuf = new byte[ReadBufferSize];
-        var chunkOutputBuffer = new ArrayBufferWriter<byte>(ReadBufferSize * 2);
-        int bytesRead;
+        var currentChunkBytes = new byte[ReadBufferSize];
+        var outputWriter = new ArrayBufferWriter<byte>(ReadBufferSize * 2);
+        int currentChunkSize;
 
-        while ((bytesRead = await input.ReadAsync(readBuf, ct)) > 0)
+        while ((currentChunkSize = await input.ReadAsync(currentChunkBytes, ct)) > 0)
         {
-            ProcessChunk(readBuf, bytesRead, state, chunkOutputBuffer);
+            ProcessChunk(currentChunkBytes, currentChunkSize, state, outputWriter);
             
-            await output.WriteAsync(chunkOutputBuffer.WrittenMemory, ct);
-            chunkOutputBuffer.ResetWrittenCount();
+            await output.WriteAsync(outputWriter.WrittenMemory, ct);
+            outputWriter.ResetWrittenCount();
         }
 
         EnsureCompletedState(state);
@@ -50,19 +50,19 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
     // Processes one read buffer chunk and rejects trailing bytes after a completed footer.
     private static void ProcessChunk(
-        byte[] buffer,
-        int bytesRead,
+        byte[] chunkBytes,
+        int currentChunkSize,
         ParserState state,
-        ArrayBufferWriter<byte> chunkOutputBuffer)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (state.IsFooterFullyRead)
             throw new InvalidOperationException("Unexpected bytes after footer '789'.");
 
-        for (var index = 0; index < bytesRead; index++)
+        for (var index = 0; index < currentChunkSize; index++)
         {
-            ProcessByte(buffer[index], state, chunkOutputBuffer);
+            ProcessByte(chunkBytes[index], state, outputWriter);
 
-            if (state.IsFooterFullyRead && index + 1 < bytesRead)
+            if (state.IsFooterFullyRead && index + 1 < currentChunkSize)
                 throw new InvalidOperationException("Unexpected bytes after footer '789'.");
         }
     }
@@ -71,7 +71,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     private static void ProcessByte(
         byte currentByte,
         ParserState state,
-        ArrayBufferWriter<byte> chunkOutputBuffer)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (currentByte == CarriageReturn)
         {
@@ -87,7 +87,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
             if (currentByte != LineFeed)
                 throw new InvalidOperationException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
 
-            ProcessNewLine(state, chunkOutputBuffer);
+            ProcessNewLine(state, outputWriter);
             return;
         }
 
@@ -99,11 +99,11 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         if (currentByte == LineFeed)
         {
-            ProcessNewLine(state, chunkOutputBuffer);
+            ProcessNewLine(state, outputWriter);
             return;
         }
 
-        ProcessDataByte(currentByte, state, chunkOutputBuffer);
+        ProcessDataByte(currentByte, state, outputWriter);
     }
 
     // Decides whether the current byte should be interpreted as part of the footer.
@@ -133,7 +133,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     // Validates block boundaries on newline, writes it through, and enables footer detection.
     private static void ProcessNewLine(
         ParserState state,
-        ArrayBufferWriter<byte> chunkOutputBuffer)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (state.CurrentBlockByteCount != 0)
         {
@@ -141,7 +141,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
                 $"Invalid ABC file: newline encountered after {state.CurrentBlockByteCount} of {BlockSize} bytes in a block (incomplete A*C block).");
         }
 
-        chunkOutputBuffer.Write(NewLineByte);
+        outputWriter.Write(NewLineByte);
         state.ExpectingFooterStartAfterNewLine = true;
     }
 
@@ -149,7 +149,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     private static void ProcessDataByte(
         byte currentByte,
         ParserState state,
-        ArrayBufferWriter<byte> chunkOutputBuffer)
+        ArrayBufferWriter<byte> outputWriter)
     {
         state.ExpectingFooterStartAfterNewLine = false;
         state.CurrentBlockBytes[state.CurrentBlockByteCount++] = currentByte;
@@ -159,14 +159,14 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         if (state.CurrentBlockByteCount < state.CurrentBlockBytes.Length)
             return;
 
-        WriteSanitizedBlock(state.CurrentBlockBytes, chunkOutputBuffer);
+        WriteSanitizedBlock(state.CurrentBlockBytes, outputWriter);
         state.CurrentBlockByteCount = 0;
     }
 
     // Validates a full A*C block and writes either the original or replacement block.
     private static void WriteSanitizedBlock(
         byte[] blockBuffer,
-        ArrayBufferWriter<byte> chunkOutputBuffer)
+        ArrayBufferWriter<byte> outputWriter)
     {
         if (blockBuffer[0] != BlockStartByte || blockBuffer[2] != BlockEndByte)
         {
@@ -176,10 +176,9 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         }
 
         byte dataByte = blockBuffer[1];
-        if (dataByte is >= BenignMinByte and <= BenignMaxByte)
-            chunkOutputBuffer.Write(blockBuffer.AsSpan(0, BlockSize));
-        else
-            chunkOutputBuffer.Write(ReplacementBlock);
+        outputWriter.Write(dataByte is >= BenignMinByte and <= BenignMaxByte
+            ? blockBuffer.AsSpan(0, BlockSize)
+            : ReplacementBlock);
     }
 
     // Verifies parsing ended in a valid terminal state and raises detailed structural errors.
