@@ -185,7 +185,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
             return;
 
         if (state.SeenCarriageReturn)
-            throw new InvalidOperationException("Invalid line ending: file ended with '\\r' without trailing '\\n'.");
+            throw new InvalidOperationException(@"Invalid line ending: file ended with '\r' without trailing '\n'.");
 
         if (state.FooterBytesMatchedCount > 0)
         {
