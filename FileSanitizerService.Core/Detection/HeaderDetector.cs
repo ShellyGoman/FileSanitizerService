@@ -19,6 +19,9 @@ public sealed class HeaderDetector : IFormatDetector
         var buffer = new byte[MaxHeaderLength];
         var bytesRead = 
             await stream.ReadAsync(buffer.AsMemory(0, MaxHeaderLength), ct);
+        if (bytesRead == 0)
+            throw new ArgumentException("Uploaded file is empty.");
+
         var prefetchedBytes = buffer.AsSpan(0, bytesRead).ToArray();
         
         // go through all headers formats exists in the system and check if one matches

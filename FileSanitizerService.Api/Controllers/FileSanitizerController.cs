@@ -1,8 +1,10 @@
 using FileSanitizerService.Api.Filters;
+using FileSanitizerService.Api.Options;
 using FileSanitizerService.Api.Utils;
 using FileSanitizerService.Core.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 
 namespace FileSanitizerService.Api.Controllers;
 
@@ -10,36 +12,37 @@ namespace FileSanitizerService.Api.Controllers;
 [Route("api")]
 public class FileSanitizerController : ControllerBase
 {
-    private readonly SanitizationService _service;
+    private const long DefaultMaxUploadBytes = 500L * 1024 * 1024;
+    private const int MultipartHeadersLengthLimit = 64 * 1024;
 
-    public FileSanitizerController(SanitizationService service)
+    private readonly SanitizationService _service;
+    private readonly long _maxUploadBytes;
+
+    public FileSanitizerController(SanitizationService service, IOptions<UploadLimitsOptions> uploadLimitsOptions)
     {
         _service = service;
+        _maxUploadBytes = uploadLimitsOptions.Value.MaxUploadBytes > 0
+            ? uploadLimitsOptions.Value.MaxUploadBytes
+            : DefaultMaxUploadBytes;
     }
 
     [HttpPost("sanitize")]
     [DisableFormValueModelBinding]
-    [DisableRequestSizeLimit]
     public async Task<IActionResult> Sanitize(CancellationToken ct)
     {
         if (!MultipartRequestHelper.TryGetMultipartContentType(Request.ContentType, out var contentType))
             return BadRequest("Expected a multipart/form-data request.");
 
-        string boundary;
-        try
-        {
-            boundary = MultipartRequestHelper.GetBoundary(contentType);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-
-        var reader = new MultipartReader(boundary, Request.Body);
-
         FileMultipartSection? fileSection;
+        
         try
         {
+            var boundary = MultipartRequestHelper.GetBoundary(contentType);
+            var reader = new MultipartReader(boundary, Request.Body)
+            {
+                BodyLengthLimit = _maxUploadBytes,
+                HeadersLengthLimit = MultipartHeadersLengthLimit
+            };
             fileSection = await MultipartRequestHelper.FindFileSectionAsync(reader, ct);
         }
         catch (ArgumentException ex)

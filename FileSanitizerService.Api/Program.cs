@@ -1,13 +1,24 @@
 using FileSanitizerService.Api.Middlewares;
+using FileSanitizerService.Api.Options;
 using FileSanitizerService.Api.Extensions;
 using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
 const long DefaultMaxUploadBytes = 500L * 1024 * 1024;
-var maxUploadBytes = builder.Configuration.GetValue<long?>("UploadLimits:MaxUploadBytes") ?? DefaultMaxUploadBytes;
 
 builder.Services.AddFileSanitizerServices();
+builder.Services
+    .AddOptions<UploadLimitsOptions>()
+    .Bind(builder.Configuration.GetSection(UploadLimitsOptions.SectionName));
+
+var uploadLimits = builder.Configuration
+    .GetSection(UploadLimitsOptions.SectionName)
+    .Get<UploadLimitsOptions>() ?? new UploadLimitsOptions();
+var maxUploadBytes = uploadLimits.MaxUploadBytes > 0
+    ? uploadLimits.MaxUploadBytes
+    : DefaultMaxUploadBytes;
+
 builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = maxUploadBytes;

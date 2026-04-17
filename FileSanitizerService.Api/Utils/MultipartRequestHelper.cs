@@ -25,7 +25,8 @@ internal static class MultipartRequestHelper
             : boundary;
     }
 
-    // Advances through multipart sections and returns the first file section found.
+    // Goes through multipart sections and returns only the first file section found.
+    // Note: one multipart "file section" contains the full uploaded file stream.
     internal static async Task<FileMultipartSection?> FindFileSectionAsync(
         MultipartReader reader,
         CancellationToken ct)
@@ -39,8 +40,14 @@ internal static class MultipartRequestHelper
                 if (fileSection is not null)
                     return fileSection;
 
+                // This section is not a file (for example a text form field).
+                // Drain and discard it so MultipartReader can advance to the next section.
                 await section.Body.CopyToAsync(Stream.Null, ct);
             }
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new ArgumentException("Invalid multipart body.", ex);
         }
         catch (IOException ex)
         {
@@ -51,6 +58,8 @@ internal static class MultipartRequestHelper
     }
 
     // Returns the file name from the section, or null if it is absent or whitespace.
-    internal static string? GetFileName(FileMultipartSection section) =>
-        string.IsNullOrWhiteSpace(section.FileName) ? null : section.FileName;
+    internal static string? GetFileName(FileMultipartSection section)
+    {
+        return string.IsNullOrWhiteSpace(section.FileName) ? null : section.FileName;
+    }
 }

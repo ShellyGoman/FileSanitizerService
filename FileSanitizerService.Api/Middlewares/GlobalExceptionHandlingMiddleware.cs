@@ -1,48 +1,67 @@
+using System.Net;
 using System.Text.Json;
 
 namespace FileSanitizerService.Api.Middlewares;
 
-public sealed class GlobalExceptionHandlingMiddleware(RequestDelegate next,
-    ILogger<GlobalExceptionHandlingMiddleware> logger)
+public sealed class GlobalExceptionHandlingMiddleware
 {
+    private readonly RequestDelegate _next;
+    private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger;
+
+    public GlobalExceptionHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<GlobalExceptionHandlingMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
     public async Task InvokeAsync(HttpContext context)
     {
         try
         {
-            await next(context);
+            await _next(context);
         }
         catch (Exception ex)
         {
-            var (statusCode, logLevel, customLogMessage) = ex switch
-            {
-                ArgumentException => (400, LogLevel.Warning, "Bad request validation failed."),
-                InvalidOperationException => (422, LogLevel.Warning, "Unprocessable content for sanitization."),
-                NotSupportedException => (415, LogLevel.Warning, "Unsupported file format or operation."),
-                UnauthorizedAccessException => (403, LogLevel.Warning, "Access denied while processing request."),
-                _ => (500, LogLevel.Error, "Unexpected server error.")
-            };
-
-            logger.Log(
-                logLevel,
-                ex,
-                "HTTP {StatusCode} - {CustomLog}. Exception: {ExceptionMessage}. {ExceptionType} for {Method} {Path}",
-                statusCode,
-                customLogMessage,
-                ex.Message,
-                ex.GetType().Name,
-                context.Request.Method,
-                context.Request.Path);
-            await WriteErrorResponseAsync(context, statusCode, ex.Message);
+            await HandleExceptionAsync(context, ex, _logger);
         }
     }
 
-    private static Task WriteErrorResponseAsync(HttpContext context, int statusCode, string message)
+    private static Task HandleExceptionAsync(
+        HttpContext context,
+        Exception ex,
+        ILogger<GlobalExceptionHandlingMiddleware> logger)
     {
-        context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/json";
+        var response = context.Response;
+        response.ContentType = "application/json";
 
-        var body = JsonSerializer.Serialize(new { status = statusCode, error = message });
+        var baseMessage = string.IsNullOrWhiteSpace(ex.Message) ? "No details." : ex.Message;
+        var (statusCode, message) = ex switch
+        {
+            ArgumentException => (HttpStatusCode.BadRequest, baseMessage),
+            InvalidOperationException => ((HttpStatusCode)StatusCodes.Status422UnprocessableEntity, baseMessage),
+            NotSupportedException => (HttpStatusCode.UnsupportedMediaType, baseMessage),
+            UnauthorizedAccessException => (HttpStatusCode.Forbidden, baseMessage),
+            KeyNotFoundException => (HttpStatusCode.NotFound, baseMessage),
+            _ => (HttpStatusCode.InternalServerError, "Unexpected server error.")
+        };
 
-        return context.Response.WriteAsync(body);
+        response.StatusCode = (int)statusCode;
+        logger.LogWarning(
+            "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+            response.StatusCode,
+            ex.GetType().Name,
+            message,
+            context.Request.Method,
+            context.Request.Path);
+
+        var result = JsonSerializer.Serialize(new
+        {
+            error = message,
+            status = response.StatusCode
+        });
+
+        return response.WriteAsync(result);
     }
 }

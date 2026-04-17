@@ -20,7 +20,7 @@ public sealed class SanitizationService
     }
     
     public async Task<Stream> SanitizeToTempFileAsync(
-        Stream input,
+        Stream inputStream,
         CancellationToken ct = default)
     {
         var tempPath = _tempFileProvider.CreatePath();
@@ -28,7 +28,7 @@ public sealed class SanitizationService
         {
             await using (var tempWriteStream = _tempFileProvider.OpenWrite(tempPath))
             {
-                await DetectFileTypeAndSanitizeAsync(input, tempWriteStream, ct);
+                await DetectFileTypeAndSanitizeAsync(inputStream, tempWriteStream, ct);
                 await tempWriteStream.FlushAsync(ct);
             }
 
