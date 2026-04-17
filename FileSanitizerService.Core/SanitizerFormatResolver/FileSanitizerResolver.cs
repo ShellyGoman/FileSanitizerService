@@ -1,7 +1,7 @@
 using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.Models;
 
-namespace FileSanitizerService.Core.Registry;
+namespace FileSanitizerService.Core.SanitizerFormatResolver;
 
 public sealed class FileSanitizerResolver : IFileSanitizerResolver
 {

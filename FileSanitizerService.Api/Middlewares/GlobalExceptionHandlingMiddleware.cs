@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace FileSanitizerService.Api.Middlewares;
@@ -48,19 +49,37 @@ public sealed class GlobalExceptionHandlingMiddleware
         };
 
         response.StatusCode = (int)statusCode;
-        logger.LogWarning(
-            "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
-            response.StatusCode,
-            ex.GetType().Name,
-            message,
-            context.Request.Method,
-            context.Request.Path);
 
-        var result = JsonSerializer.Serialize(new
-        {
-            error = message,
-            status = response.StatusCode
-        });
+        if (statusCode is HttpStatusCode.InternalServerError)
+            logger.LogError(ex,
+                "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+                response.StatusCode,
+                ex.GetType().Name,
+                message,
+                context.Request.Method,
+                context.Request.Path);
+        
+        if (statusCode is HttpStatusCode.UnprocessableEntity)
+            logger.LogError(
+                "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+                response.StatusCode,
+                ex.GetType().Name,
+                message,
+                context.Request.Method,
+                context.Request.Path);
+        
+        else
+            logger.LogWarning(
+                "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+                response.StatusCode,
+                ex.GetType().Name,
+                message,
+                context.Request.Method,
+                context.Request.Path);
+
+        var result = JsonSerializer.Serialize(
+            new { error = message, status = response.StatusCode },
+            new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
 
         return response.WriteAsync(result);
     }

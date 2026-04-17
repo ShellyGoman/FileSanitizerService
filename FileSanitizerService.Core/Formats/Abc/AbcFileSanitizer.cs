@@ -11,18 +11,21 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     private const byte BlockEndByte = (byte)'C';
     private const byte BenignMinByte = (byte)'1';
     private const byte BenignMaxByte = (byte)'9';
+    private const byte LineFeed = (byte)'\n';
+    private const byte CarriageReturn = (byte)'\r';
 
     private static readonly byte[] HeaderBytes = "123\n"u8.ToArray();
     private static readonly byte[] ReplacementBlock = "A255C"u8.ToArray();
     private static readonly byte[] FooterBytes = "789"u8.ToArray();
-    private static readonly byte[] NewLineByte = [(byte)'\n'];
+    private static readonly byte[] NewLineByte = [LineFeed];
 
     public FileFormat SupportedFormat => FileFormat.Abc;
 
+    // Streams the ABC file, sanitizes each data block,
+    // and writes the result to a temp output
     public async Task SanitizeAsync(
         Stream input, Stream output, CancellationToken ct = default)
     {
-        await ValidateAndConsumeHeaderAsync(input, ct);
         await output.WriteAsync(HeaderBytes, ct);
 
         var state = new ParserState();
@@ -38,25 +41,6 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         await output.WriteAsync(FooterBytes, ct);
     }
     
-    // Reads and validates the ABC header without relying on stream seek support.
-    private static async Task ValidateAndConsumeHeaderAsync(Stream input, CancellationToken ct)
-    {
-        var headerBuffer = new byte[HeaderBytes.Length];
-        var offset = 0;
-
-        while (offset < headerBuffer.Length)
-        {
-            var bytesRead = await input.ReadAsync(headerBuffer.AsMemory(offset, headerBuffer.Length - offset), ct);
-            if (bytesRead == 0)
-                throw new InvalidOperationException("Missing header: file must start with '123\\n'.");
-
-            offset += bytesRead;
-        }
-
-        if (!headerBuffer.AsSpan().SequenceEqual(HeaderBytes))
-            throw new InvalidOperationException("Invalid header: file must start with '123\\n'.");
-    }
-
     // Processes one read buffer chunk and rejects trailing bytes after a completed footer.
     private static async Task ProcessChunkAsync(
         byte[] buffer,
@@ -84,6 +68,24 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         Stream output,
         CancellationToken ct)
     {
+        if (currentByte == CarriageReturn)
+        {
+            state.SeenCarriageReturn = true;
+            return;
+        }
+
+        if (state.SeenCarriageReturn)
+        {
+            state.SeenCarriageReturn = false;
+            
+            // after \r we expect to see \n only
+            if (currentByte != LineFeed)
+                throw new InvalidOperationException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
+
+            await ProcessNewLineAsync(state, output, ct);
+            return;
+        }
+
         if (ShouldParseFooter(currentByte, state))
         {
             ProcessFooterByte(currentByte, state);
@@ -132,7 +134,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         if (state.CurrentBlockByteCount != 0)
         {
             throw new InvalidOperationException(
-                "Invalid ABC file: newline encountered inside a block.");
+                $"Invalid ABC file: newline encountered after {state.CurrentBlockByteCount} of {BlockSize} bytes in a block (incomplete A*C block).");
         }
 
         await output.WriteAsync(NewLineByte, ct);
@@ -149,6 +151,8 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         state.ExpectingFooterStartAfterNewLine = false;
         state.CurrentBlockBytes[state.CurrentBlockByteCount++] = currentByte;
 
+        // did not create yet the full block with the full length (3)
+        // need to wait fot the rest of the data
         if (state.CurrentBlockByteCount < state.CurrentBlockBytes.Length)
             return;
 
@@ -166,7 +170,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         {
             throw new InvalidOperationException(
                 $"Invalid block: expected A<byte>C, got " +
-                $"0x{blockBuffer[0]:X2} 0x{blockBuffer[1]:X2} 0x{blockBuffer[2]:X2}.");
+                $"'{(char)blockBuffer[0]}' '{(char)blockBuffer[1]}' '{(char)blockBuffer[2]}'.");
         }
 
         byte dataByte = blockBuffer[1];
@@ -181,6 +185,9 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     {
         if (state.IsFooterFullyRead)
             return;
+
+        if (state.SeenCarriageReturn)
+            throw new InvalidOperationException(@"Invalid line ending: file ended with '\r' without trailing '\n'.");
 
         if (state.FooterBytesMatchedCount > 0)
         {
@@ -202,10 +209,12 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         public int CurrentBlockByteCount { get; set; }
 
-        public bool ExpectingFooterStartAfterNewLine { get; set; }
+        public bool ExpectingFooterStartAfterNewLine { get; set; } = true;
 
         public int FooterBytesMatchedCount { get; set; }
 
         public bool IsFooterFullyRead { get; set; }
+
+        public bool SeenCarriageReturn { get; set; }
     }
 }

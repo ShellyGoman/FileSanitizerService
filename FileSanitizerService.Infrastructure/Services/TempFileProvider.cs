@@ -5,8 +5,9 @@ namespace FileSanitizerService.Infrastructure.Services;
 public sealed class TempFileProvider : ITempFileProvider
 {
     private const string DirectoryName = "FileSanitizerServiceTmp";
-    private const int StreamBufferSize = 64 * 1024;
+    private const int StreamBufferSize = 64 * 1024; // 64 kb
 
+    // Generates a unique temp file path inside the service's dedicated temp directory.
     public string CreatePath()
     {
         var root = Path.Combine(Path.GetTempPath(), DirectoryName);
@@ -15,6 +16,7 @@ public sealed class TempFileProvider : ITempFileProvider
         return Path.Combine(root, $"{Guid.NewGuid():N}.tmp");
     }
 
+    // Opens a write-only buffered async stream to the specified path, creating a new file.
     public Stream OpenWrite(string path)
     {
         return new FileStream(
@@ -26,6 +28,7 @@ public sealed class TempFileProvider : ITempFileProvider
             FileOptions.Asynchronous | FileOptions.SequentialScan);
     }
 
+    // Opens a read-only buffered async stream that automatically deletes the file on close.
     public Stream OpenReadTemporary(string path)
     {
         return new FileStream(
@@ -37,6 +40,7 @@ public sealed class TempFileProvider : ITempFileProvider
             FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
     }
 
+    // Attempts to delete the temp file at the given path, if failed logs the error
     public void TryDelete(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
