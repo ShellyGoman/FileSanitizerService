@@ -21,6 +21,8 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
     public FileFormat SupportedFormat => FileFormat.Abc;
 
+    // Streams the ABC file, sanitizes each data block,
+    // and writes the result to a temp output
     public async Task SanitizeAsync(
         Stream input, Stream output, CancellationToken ct = default)
     {

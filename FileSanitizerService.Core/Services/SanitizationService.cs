@@ -19,6 +19,8 @@ public sealed class SanitizationService
         _tempFileProvider = tempFileProvider;
     }
     
+    // Sanitizes the input stream and writes the result to a temp file,
+    // returning a read stream to it
     public async Task<Stream> SanitizeToTempFileAsync(
         Stream inputStream,
         CancellationToken ct = default)
@@ -41,6 +43,7 @@ public sealed class SanitizationService
         }
     }
 
+    // Detects the file format from the input stream and forward to the matching sanitizer
     private async Task DetectFileTypeAndSanitizeAsync(
         Stream input,
         Stream output,
