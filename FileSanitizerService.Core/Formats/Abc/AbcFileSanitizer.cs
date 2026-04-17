@@ -151,6 +151,8 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         state.ExpectingFooterStartAfterNewLine = false;
         state.CurrentBlockBytes[state.CurrentBlockByteCount++] = currentByte;
 
+        // did not create yet the full block with the full length (3)
+        // need to wait fot the rest of the data
         if (state.CurrentBlockByteCount < state.CurrentBlockBytes.Length)
             return;
 
