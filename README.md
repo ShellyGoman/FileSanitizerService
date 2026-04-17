@@ -23,6 +23,20 @@ dotnet run --project FileSanitizerService.Api
 The API will be available at `http://localhost:5000` (or `https://localhost:5001`).  
 Swagger UI is available at `/swagger` when running in Development mode.
 
+### Run with Docker Compose
+
+```bash
+docker compose -f docker-compose.yml up --build -d
+```
+
+The API will be available at `http://localhost:8080`.
+
+To stop and remove containers/volumes:
+
+```bash
+docker compose -f docker-compose.yml down -v
+```
+
 ---
 
 ## Sending a file
