@@ -63,7 +63,7 @@ public sealed class SanitizationService
 
         if (format == FileFormat.Unknown)
         {
-            _logger.LogWarning("File format could not be detected — rejecting request");
+            _logger.LogError("File format could not be detected — rejecting request");
             throw new ArgumentException("Unsupported or unrecognized file format.");
         }
 

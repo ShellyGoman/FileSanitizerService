@@ -92,7 +92,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
             return;
         }
 
-        if (currentByte == (byte)'\n')
+        if (currentByte == LineFeed)
         {
             await ProcessNewLineAsync(state, output, ct);
             return;

@@ -4,5 +4,5 @@ public class UploadLimitsOptions
 {
     public const string SectionName = "UploadLimits";
 
-    public long MaxUploadBytes { get; set; }
+    public long MaxUploadBytes { get; init; }
 }
