@@ -49,13 +49,23 @@ public sealed class GlobalExceptionHandlingMiddleware
         };
 
         response.StatusCode = (int)statusCode;
-        logger.LogWarning(
-            "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
-            response.StatusCode,
-            ex.GetType().Name,
-            message,
-            context.Request.Method,
-            context.Request.Path);
+
+        if (statusCode is HttpStatusCode.InternalServerError or HttpStatusCode.UnprocessableEntity)
+            logger.LogError(ex,
+                "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+                response.StatusCode,
+                ex.GetType().Name,
+                message,
+                context.Request.Method,
+                context.Request.Path);
+        else
+            logger.LogWarning(
+                "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+                response.StatusCode,
+                ex.GetType().Name,
+                message,
+                context.Request.Method,
+                context.Request.Path);
 
         var result = JsonSerializer.Serialize(
             new { error = message, status = response.StatusCode },

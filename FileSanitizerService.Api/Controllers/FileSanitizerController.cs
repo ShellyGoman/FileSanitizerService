@@ -16,11 +16,16 @@ public class FileSanitizerController : ControllerBase
     private const int MultipartHeadersLengthLimit = 64 * 1024; // 64 kb
 
     private readonly SanitizationService _service;
+    private readonly ILogger<FileSanitizerController> _logger;
     private readonly long _maxUploadBytes;
 
-    public FileSanitizerController(SanitizationService service, IOptions<UploadLimitsOptions> uploadLimitsOptions)
+    public FileSanitizerController(
+        SanitizationService service,
+        IOptions<UploadLimitsOptions> uploadLimitsOptions,
+        ILogger<FileSanitizerController> logger)
     {
         _service = service;
+        _logger = logger;
         _maxUploadBytes = uploadLimitsOptions.Value.MaxUploadBytes > 0
             ? uploadLimitsOptions.Value.MaxUploadBytes
             : DefaultMaxUploadBytes;
@@ -58,8 +63,12 @@ public class FileSanitizerController : ControllerBase
 
         var fileName = MultipartRequestHelper.GetFileName(fileSection) ?? "sanitized.bin";
 
-        var sanitizedStream = await _service.SanitizeToTempFileAsync(fileStream, ct);
+        _logger.LogInformation("Sanitize request received for '{FileName}'", fileName);
+
+        var sanitizedStream = await _service.SanitizeToTempFileAsync(fileStream, fileName, ct);
         HttpContext.Response.RegisterForDispose(sanitizedStream);
+
+        _logger.LogInformation("Sanitization complete for '{FileName}'", fileName);
 
         return File(sanitizedStream, "application/octet-stream", fileName);
     }

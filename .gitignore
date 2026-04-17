@@ -39,6 +39,7 @@ ScaffoldingReadMe.txt
 
 # Logs
 *.log
+logs/
 
 # NuGet
 *.nupkg
