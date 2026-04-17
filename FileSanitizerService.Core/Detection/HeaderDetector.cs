@@ -5,14 +5,15 @@ namespace FileSanitizerService.Core.Detection;
 
 public sealed class HeaderDetector : IFormatDetector
 {
-    private static readonly IReadOnlyDictionary<FileFormat, byte[]> Headers =
-        new Dictionary<FileFormat, byte[]>
-        {
-            [FileFormat.Abc] = "123\n"u8.ToArray()
-        };
+    private static readonly IReadOnlyList<(FileFormat Format, byte[] Header)> Headers =
+    [
+        // Keep longest signatures first so CRLF is matched before LF.
+        (FileFormat.Abc, "123\r\n"u8.ToArray()),
+        (FileFormat.Abc, "123\n"u8.ToArray())
+    ];
 
     private static readonly int MaxHeaderLength =
-        Headers.Values.Max(s => s.Length);
+        Headers.Max(signature => signature.Header.Length);
 
     public async Task<FormatDetectionResult> DetectAsync(Stream stream, CancellationToken ct = default)
     {
@@ -25,7 +26,7 @@ public sealed class HeaderDetector : IFormatDetector
         var prefetchedBytes = buffer.AsSpan(0, bytesRead).ToArray();
         
         // go through all headers formats exists in the system and check if one matches
-        foreach (var (format, header) in Headers.OrderByDescending(pair => pair.Value.Length))
+        foreach (var (format, header) in Headers)
         {
             if (bytesRead >= header.Length &&
                 buffer.AsSpan(0, header.Length).SequenceEqual(header))

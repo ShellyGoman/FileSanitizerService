@@ -12,8 +12,8 @@ namespace FileSanitizerService.Api.Controllers;
 [Route("api")]
 public class FileSanitizerController : ControllerBase
 {
-    private const long DefaultMaxUploadBytes = 500L * 1024 * 1024;
-    private const int MultipartHeadersLengthLimit = 64 * 1024;
+    private const long DefaultMaxUploadBytes = 500L * 1024 * 1024; // 500 mb
+    private const int MultipartHeadersLengthLimit = 64 * 1024; // 64 kb
 
     private readonly SanitizationService _service;
     private readonly long _maxUploadBytes;
@@ -44,14 +44,13 @@ public class FileSanitizerController : ControllerBase
                 HeadersLengthLimit = MultipartHeadersLengthLimit
             };
             fileSection = await MultipartRequestHelper.FindFileSectionAsync(reader, ct);
+            if (fileSection is null)
+                return BadRequest("No file provided or file is empty.");
         }
         catch (ArgumentException ex)
         {
             return BadRequest(ex.Message);
         }
-
-        if (fileSection is null)
-            return BadRequest("No file provided or file is empty.");
 
         var fileStream = fileSection.FileStream;
         if (fileStream is null)

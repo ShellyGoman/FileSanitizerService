@@ -11,18 +11,20 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     private const byte BlockEndByte = (byte)'C';
     private const byte BenignMinByte = (byte)'1';
     private const byte BenignMaxByte = (byte)'9';
+    private const byte LineFeed = (byte)'\n';
+    private const byte CarriageReturn = (byte)'\r';
 
     private static readonly byte[] HeaderBytes = "123\n"u8.ToArray();
     private static readonly byte[] ReplacementBlock = "A255C"u8.ToArray();
     private static readonly byte[] FooterBytes = "789"u8.ToArray();
-    private static readonly byte[] NewLineByte = [(byte)'\n'];
+    private static readonly byte[] NewLineByte = [LineFeed];
 
     public FileFormat SupportedFormat => FileFormat.Abc;
 
     public async Task SanitizeAsync(
         Stream input, Stream output, CancellationToken ct = default)
     {
-        await ValidateAndConsumeHeaderAsync(input, ct);
+        await SkipHeaderAsync(input, ct);
         await output.WriteAsync(HeaderBytes, ct);
 
         var state = new ParserState();
@@ -38,23 +40,11 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         await output.WriteAsync(FooterBytes, ct);
     }
     
-    // Reads and validates the ABC header without relying on stream seek support.
-    private static async Task ValidateAndConsumeHeaderAsync(Stream input, CancellationToken ct)
+    // Skips past the header line (already validated by HeaderDetector).
+    private static async Task SkipHeaderAsync(Stream input, CancellationToken ct)
     {
-        var headerBuffer = new byte[HeaderBytes.Length];
-        var offset = 0;
-
-        while (offset < headerBuffer.Length)
-        {
-            var bytesRead = await input.ReadAsync(headerBuffer.AsMemory(offset, headerBuffer.Length - offset), ct);
-            if (bytesRead == 0)
-                throw new InvalidOperationException("Missing header: file must start with '123\\n'.");
-
-            offset += bytesRead;
-        }
-
-        if (!headerBuffer.AsSpan().SequenceEqual(HeaderBytes))
-            throw new InvalidOperationException("Invalid header: file must start with '123\\n'.");
+        var oneByte = new byte[1];
+        while (await input.ReadAsync(oneByte, ct) > 0 && oneByte[0] != (byte)'\n') { }
     }
 
     // Processes one read buffer chunk and rejects trailing bytes after a completed footer.
@@ -84,6 +74,24 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         Stream output,
         CancellationToken ct)
     {
+        if (currentByte == CarriageReturn)
+        {
+            state.SeenCarriageReturn = true;
+            return;
+        }
+
+        if (state.SeenCarriageReturn)
+        {
+            state.SeenCarriageReturn = false;
+            
+            // after \r we expect to see \n only
+            if (currentByte != LineFeed)
+                throw new InvalidOperationException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
+
+            await ProcessNewLineAsync(state, output, ct);
+            return;
+        }
+
         if (ShouldParseFooter(currentByte, state))
         {
             ProcessFooterByte(currentByte, state);
@@ -182,6 +190,9 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         if (state.IsFooterFullyRead)
             return;
 
+        if (state.SeenCarriageReturn)
+            throw new InvalidOperationException("Invalid line ending: file ended with '\\r' without trailing '\\n'.");
+
         if (state.FooterBytesMatchedCount > 0)
         {
             throw new InvalidOperationException(
@@ -207,5 +218,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         public int FooterBytesMatchedCount { get; set; }
 
         public bool IsFooterFullyRead { get; set; }
+
+        public bool SeenCarriageReturn { get; set; }
     }
 }
