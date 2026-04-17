@@ -166,7 +166,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         {
             throw new InvalidOperationException(
                 $"Invalid block: expected A<byte>C, got " +
-                $"0x{blockBuffer[0]:X2} 0x{blockBuffer[1]:X2} 0x{blockBuffer[2]:X2}.");
+                $"'{(char)blockBuffer[0]}' '{(char)blockBuffer[1]}' '{(char)blockBuffer[2]}'.");
         }
 
         byte dataByte = blockBuffer[1];
@@ -205,7 +205,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         public int CurrentBlockByteCount { get; set; }
 
-        public bool ExpectingFooterStartAfterNewLine { get; set; }
+        public bool ExpectingFooterStartAfterNewLine { get; set; } = true;
 
         public int FooterBytesMatchedCount { get; set; }
 

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace FileSanitizerService.Api.Middlewares;
@@ -56,11 +57,9 @@ public sealed class GlobalExceptionHandlingMiddleware
             context.Request.Method,
             context.Request.Path);
 
-        var result = JsonSerializer.Serialize(new
-        {
-            error = message,
-            status = response.StatusCode
-        });
+        var result = JsonSerializer.Serialize(
+            new { error = message, status = response.StatusCode },
+            new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
 
         return response.WriteAsync(result);
     }
