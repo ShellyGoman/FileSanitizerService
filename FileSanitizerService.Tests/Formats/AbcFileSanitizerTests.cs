@@ -1,4 +1,5 @@
 using System.Text;
+using FileSanitizerService.Core.Exceptions;
 using FileSanitizerService.Core.Formats.Abc;
 using FileSanitizerService.Core.Interfaces;
 
@@ -115,36 +116,36 @@ public class AbcFileSanitizerTests
     }
 
     [Fact]
-    public async Task SanitizeAsync_BlockDoesNotStartWithA_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_BlockDoesNotStartWithA_ThrowsInvalidFileStructureException()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync("B1C\n789"));
 
         Assert.Contains("Invalid block", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_BlockDoesNotEndWithC_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_BlockDoesNotEndWithC_ThrowsInvalidFileStructureException()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync("A1B\n789"));
 
         Assert.Contains("Invalid block", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_NewlineEncounteredMidBlock_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_NewlineEncounteredMidBlock_ThrowsInvalidFileStructureException()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync("A1\nC\n789"));
 
         Assert.Contains("incomplete A*C block", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_MissingFooterEntirely_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_MissingFooterEntirely_ThrowsInvalidFileStructureException()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync("A1C\n"));
 
         Assert.Contains("Missing footer", ex.Message);
@@ -153,49 +154,49 @@ public class AbcFileSanitizerTests
     [Theory]
     [InlineData("7")]
     [InlineData("78")]
-    public async Task SanitizeAsync_PartialFooter_ThrowsInvalidOperationException(string partialFooter)
+    public async Task SanitizeAsync_PartialFooter_ThrowsInvalidFileStructureException(string partialFooter)
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync($"A1C\n{partialFooter}"));
 
         Assert.Contains("Incomplete footer", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_TrailingBytesAfterFooter_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_TrailingBytesAfterFooter_ThrowsInvalidFileStructureException()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync("A1C\n789extra"));
 
         Assert.Contains("Unexpected bytes after footer", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_FileTruncatedMidBlock_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_FileTruncatedMidBlock_ThrowsInvalidFileStructureException()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeToStringAsync("A1"));
 
         Assert.Contains("File ended mid-block", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_CarriageReturnNotFollowedByLineFeed_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_CarriageReturnNotFollowedByLineFeed_ThrowsInvalidFileStructureException()
     {
         var input = "A1C\rA3C\n789"u8.ToArray();
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeBytesToStringAsync(input));
 
         Assert.Contains(@"'\r' must be immediately followed by '\n'", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeAsync_FileEndsWithBareCarriageReturn_ThrowsInvalidOperationException()
+    public async Task SanitizeAsync_FileEndsWithBareCarriageReturn_ThrowsInvalidFileStructureException()
     {
         var input = "A1C\r"u8.ToArray();
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<InvalidFileStructureException>(
             () => SanitizeBytesToStringAsync(input));
 
         Assert.Contains(@"'\r'", ex.Message);

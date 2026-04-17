@@ -1,4 +1,5 @@
 using System.Text;
+using FileSanitizerService.Core.Exceptions;
 using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.Models;
 using FileSanitizerService.Core.Services;
@@ -55,29 +56,29 @@ public class SanitizationServiceTests
     }
 
     [Fact]
-    public async Task SanitizeToTempFileAsync_UnknownFormat_ThrowsArgumentException()
+    public async Task SanitizeToTempFileAsync_UnknownFormat_ThrowsUnsupportedFormatException()
     {
         _detectorMock
             .Setup(d => d.DetectAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FormatDetectionResult(FileFormat.Unknown));
 
-        var ex = await Assert.ThrowsAsync<ArgumentException>(
+        var ex = await Assert.ThrowsAsync<UnsupportedFormatException>(
             () => _sut.SanitizeToTempFileAsync(StreamFrom("XYZ\nA1C\n789")));
 
         Assert.Equal("Unsupported or unrecognized file format.", ex.Message);
     }
 
     [Fact]
-    public async Task SanitizeToTempFileAsync_NoSanitizerRegistered_ThrowsArgumentException()
+    public async Task SanitizeToTempFileAsync_NoSanitizerRegistered_ThrowsSanitizerConfigurationException()
     {
         _resolverMock
             .Setup(r => r.GetSanitizerByFormat(It.IsAny<FileFormat>()))
             .Returns((IFileSanitizer?)null);
 
-        var ex = await Assert.ThrowsAsync<ArgumentException>(
+        var ex = await Assert.ThrowsAsync<SanitizerConfigurationException>(
             () => _sut.SanitizeToTempFileAsync(StreamFrom("123\nA1C\n789")));
 
-        Assert.Contains("No sanitizer found for format", ex.Message);
+        Assert.Contains("No sanitizer registered for detected format", ex.Message);
     }
 
     [Fact]

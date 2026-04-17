@@ -1,4 +1,5 @@
 using System.Buffers;
+using FileSanitizerService.Core.Exceptions;
 using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.Models;
 
@@ -56,14 +57,14 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         ArrayBufferWriter<byte> outputWriter)
     {
         if (state.IsFooterFullyRead)
-            throw new InvalidOperationException("Unexpected bytes after footer '789'.");
+            throw new InvalidFileStructureException("Unexpected bytes after footer '789'.");
 
         for (var index = 0; index < currentChunkSize; index++)
         {
             ProcessByte(chunkBytes[index], state, outputWriter);
 
             if (state.IsFooterFullyRead && index + 1 < currentChunkSize)
-                throw new InvalidOperationException("Unexpected bytes after footer '789'.");
+                throw new InvalidFileStructureException("Unexpected bytes after footer '789'.");
         }
     }
 
@@ -85,7 +86,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
             // after \r we expect to see \n only
             if (currentByte != LineFeed)
-                throw new InvalidOperationException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
+                throw new InvalidFileStructureException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
 
             ProcessNewLine(state, outputWriter);
             return;
@@ -121,7 +122,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         byte expected = FooterBytes[state.FooterBytesMatchedCount];
         if (currentByte != expected)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Invalid footer: expected '{(char)expected}', got '{(char)currentByte}'.");
         }
 
@@ -137,7 +138,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     {
         if (state.CurrentBlockByteCount != 0)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Invalid ABC file: newline encountered after {state.CurrentBlockByteCount} of {BlockSize} bytes in a block (incomplete A*C block).");
         }
 
@@ -170,7 +171,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     {
         if (blockBuffer[0] != BlockStartByte || blockBuffer[2] != BlockEndByte)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Invalid block: expected A<byte>C, got " +
                 $"'{(char)blockBuffer[0]}' '{(char)blockBuffer[1]}' '{(char)blockBuffer[2]}'.");
         }
@@ -188,18 +189,18 @@ public sealed class AbcFileSanitizer : IFileSanitizer
             return;
 
         if (state.SeenCarriageReturn)
-            throw new InvalidOperationException(@"Invalid line ending: file ended with '\r' without trailing '\n'.");
+            throw new InvalidFileStructureException(@"Invalid line ending: file ended with '\r' without trailing '\n'.");
 
         if (state.FooterBytesMatchedCount > 0)
         {
-            throw new InvalidOperationException(
+            throw new InvalidFileStructureException(
                 $"Incomplete footer: file ended after partial footer (read {state.FooterBytesMatchedCount}/{FooterBytes.Length} bytes).");
         }
 
         if (state.CurrentBlockByteCount > 0)
-            throw new InvalidOperationException("File ended mid-block: incomplete A*C block.");
+            throw new InvalidFileStructureException("File ended mid-block: incomplete A*C block.");
 
-        throw new InvalidOperationException("Missing footer: file must end with '\\n789'.");
+        throw new InvalidFileStructureException("Missing footer: file must end with '\\n789'.");
     }
 
     // Keeps incremental parser state so streaming works across
