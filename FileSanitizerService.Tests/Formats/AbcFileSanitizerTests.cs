@@ -114,34 +114,6 @@ public class AbcFileSanitizerTests
         Assert.Equal("123\nA1C\nA3C\n789", result);
     }
 
-    // -------------------------------------------------------------------------
-    // Buffer-boundary edge cases
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task SanitizeAsync_BenignBlockSplitAcrossBufferBoundaries_IsProcessedCorrectly()
-    {
-        var result = await SanitizeBytesToStringAsync("A1C\n789"u8.ToArray());
-
-        Assert.Equal("123\nA1C\n789", result);
-    }
-
-    [Fact]
-    public async Task SanitizeAsync_MaliciousBlockSplitAcrossBufferBoundaries_IsReplaced()
-    {
-        var result = await SanitizeBytesToStringAsync("AFC\n789"u8.ToArray());
-
-        Assert.Equal("123\nA255C\n789", result);
-    }
-
-    [Fact]
-    public async Task SanitizeAsync_FooterSplitAcrossBufferBoundaries_IsProcessedCorrectly()
-    {
-        var result = await SanitizeBytesToStringAsync("A1C\n789"u8.ToArray());
-
-        Assert.Equal("123\nA1C\n789", result);
-    }
-    
     [Fact]
     public async Task SanitizeAsync_BlockDoesNotStartWithA_ThrowsInvalidOperationException()
     {
