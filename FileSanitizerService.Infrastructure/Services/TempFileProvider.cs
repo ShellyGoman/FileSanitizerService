@@ -1,4 +1,5 @@
 using FileSanitizerService.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace FileSanitizerService.Infrastructure.Services;
 
@@ -6,6 +7,13 @@ public sealed class TempFileProvider : ITempFileProvider
 {
     private const string DirectoryName = "FileSanitizerServiceTmp";
     private const int StreamBufferSize = 64 * 1024; // 64 kb
+    
+    private readonly ILogger<TempFileProvider> _logger;
+
+    public TempFileProvider(ILogger<TempFileProvider> logger)
+    {
+        _logger = logger;
+    }
 
     // Generates a unique temp file path inside the service's dedicated temp directory.
     public string CreatePath()
@@ -28,7 +36,7 @@ public sealed class TempFileProvider : ITempFileProvider
             FileOptions.Asynchronous | FileOptions.SequentialScan);
     }
 
-    // Opens a read-only buffered async stream that automatically deletes the file on close.
+    // FileOptions.DeleteOnClose ensures the temp file is removed when the response stream is disposed.
     public Stream OpenReadTemporary(string path)
     {
         return new FileStream(
@@ -40,7 +48,6 @@ public sealed class TempFileProvider : ITempFileProvider
             FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
     }
 
-    // Attempts to delete the temp file at the given path, if failed logs the error
     public void TryDelete(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -50,13 +57,15 @@ public sealed class TempFileProvider : ITempFileProvider
         {
             File.Delete(path);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            // TODO: Add logging for temp file cleanup failures.
+            _logger.LogWarning(ex, 
+                "Failed to delete temp file '{Path}' due to an I/O error.", path);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
-            // TODO: Add logging for temp file cleanup failures.
+            _logger.LogWarning(ex, 
+                "Failed to delete temp file '{Path}' due to insufficient permissions.", path);
         }
     }
 }

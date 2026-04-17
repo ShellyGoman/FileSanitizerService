@@ -29,7 +29,7 @@ public class AbcFileSanitizerTests
     [InlineData('1')]
     [InlineData('2')]
     [InlineData('3')]
-    public async Task SanitizeAsync_AllNineBenignDataBytes_PassThrough(char dataByte)
+    public async Task SanitizeAsync_BenignDataBytes_PassThrough(char dataByte)
     {
         var input = $"A{dataByte}C\n789";
 

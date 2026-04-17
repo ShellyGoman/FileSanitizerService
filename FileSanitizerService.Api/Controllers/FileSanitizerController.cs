@@ -1,7 +1,7 @@
 using FileSanitizerService.Api.Filters;
 using FileSanitizerService.Api.Options;
 using FileSanitizerService.Api.Utils;
-using FileSanitizerService.Core.Services;
+using FileSanitizerService.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
@@ -12,15 +12,14 @@ namespace FileSanitizerService.Api.Controllers;
 [Route("api")]
 public class FileSanitizerController : ControllerBase
 {
-    private const long DefaultMaxUploadBytes = 500L * 1024 * 1024; // 500 mb
     private const int MultipartHeadersLengthLimit = 64 * 1024; // 64 kb
 
-    private readonly SanitizationService _service;
+    private readonly ISanitizationService _service;
     private readonly ILogger<FileSanitizerController> _logger;
     private readonly long _maxUploadBytes;
 
     public FileSanitizerController(
-        SanitizationService service,
+        ISanitizationService service,
         IOptions<UploadLimitsOptions> uploadLimitsOptions,
         ILogger<FileSanitizerController> logger)
     {
@@ -28,7 +27,7 @@ public class FileSanitizerController : ControllerBase
         _logger = logger;
         _maxUploadBytes = uploadLimitsOptions.Value.MaxUploadBytes > 0
             ? uploadLimitsOptions.Value.MaxUploadBytes
-            : DefaultMaxUploadBytes;
+            : UploadLimitsOptions.DefaultMaxUploadBytes;
     }
 
     [HttpPost("sanitize")]

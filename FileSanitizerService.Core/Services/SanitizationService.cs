@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FileSanitizerService.Core.Services;
 
-public sealed class SanitizationService
+public sealed class SanitizationService : ISanitizationService
 {
     private readonly IFormatDetector _fileFormatDetector;
     private readonly IFileSanitizerResolver _fileSanitizerResolver;

@@ -31,7 +31,7 @@ Swagger UI is available at `/swagger` when running in Development mode.
 
 1. Open Postman and create a new **POST** request to:
    ```
-   https://localhost:5001/api/sanitize
+   http://localhost:5000/api/sanitize
    ```
 2. Go to the **Body** tab → select **form-data**
 3. Add a key named `file`, change its type to **File**, and attach your `.abc` file
