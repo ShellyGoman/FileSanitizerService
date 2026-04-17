@@ -50,7 +50,7 @@ public sealed class GlobalExceptionHandlingMiddleware
 
         response.StatusCode = (int)statusCode;
 
-        if (statusCode is HttpStatusCode.InternalServerError or HttpStatusCode.UnprocessableEntity)
+        if (statusCode is HttpStatusCode.InternalServerError)
             logger.LogError(ex,
                 "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
                 response.StatusCode,
@@ -58,6 +58,16 @@ public sealed class GlobalExceptionHandlingMiddleware
                 message,
                 context.Request.Method,
                 context.Request.Path);
+        
+        if (statusCode is HttpStatusCode.UnprocessableEntity)
+            logger.LogError(
+                "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
+                response.StatusCode,
+                ex.GetType().Name,
+                message,
+                context.Request.Method,
+                context.Request.Path);
+        
         else
             logger.LogWarning(
                 "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",

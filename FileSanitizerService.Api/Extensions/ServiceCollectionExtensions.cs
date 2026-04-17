@@ -2,7 +2,7 @@ using FileSanitizerService.Api.Options;
 using FileSanitizerService.Core.Detection;
 using FileSanitizerService.Core.Formats.Abc;
 using FileSanitizerService.Core.Interfaces;
-using FileSanitizerService.Core.Registry;
+using FileSanitizerService.Core.SanitizerFormatResolver;
 using FileSanitizerService.Core.Services;
 using FileSanitizerService.Infrastructure.Services;
 using Microsoft.AspNetCore.Http.Features;

@@ -134,7 +134,7 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         if (state.CurrentBlockByteCount != 0)
         {
             throw new InvalidOperationException(
-                "Invalid ABC file: newline encountered inside a block.");
+                $"Invalid ABC file: newline encountered after {state.CurrentBlockByteCount} of {BlockSize} bytes in a block (incomplete A*C block).");
         }
 
         await output.WriteAsync(NewLineByte, ct);
