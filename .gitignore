@@ -119,6 +119,7 @@ obj/
 # JetBrains Rider
 *.sln.iml
 
+.cursor/
 CLAUDE.md
 CURSOR.md
 PLAN.md

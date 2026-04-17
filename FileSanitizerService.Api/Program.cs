@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, cfg) 
     => cfg.ReadFrom.Configuration(ctx.Configuration));
 
-builder.Services.AddFileSanitizerServices();
+builder.Services.AddLocalServices();
 builder.ConfigureUploadLimits();
 
 // API infrastructure
@@ -26,7 +26,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

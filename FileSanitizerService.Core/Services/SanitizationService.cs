@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FileSanitizerService.Core.Services;
 
-public sealed class SanitizationService
+public sealed class SanitizationService : ISanitizationService
 {
     private readonly IFormatDetector _fileFormatDetector;
     private readonly IFileSanitizerResolver _fileSanitizerResolver;
@@ -63,7 +63,7 @@ public sealed class SanitizationService
 
         if (format == FileFormat.Unknown)
         {
-            _logger.LogWarning("File format could not be detected — rejecting request");
+            _logger.LogError("File format could not be detected — rejecting request");
             throw new ArgumentException("Unsupported or unrecognized file format.");
         }
 

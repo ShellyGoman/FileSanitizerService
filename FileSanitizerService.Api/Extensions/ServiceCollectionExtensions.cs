@@ -11,7 +11,7 @@ namespace FileSanitizerService.Api.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddFileSanitizerServices(this IServiceCollection services)
+    public static IServiceCollection AddLocalServices(this IServiceCollection services)
     {
         services.AddSingleton<IFormatDetector, HeaderDetector>();
 
@@ -21,16 +21,13 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IFileSanitizerResolver, FileSanitizerResolver>();
         services.AddSingleton<ITempFileProvider, TempFileProvider>();
-        services.AddScoped<SanitizationService>();
+        services.AddScoped<ISanitizationService, SanitizationService>();
 
         return services;
     }
     
     public static WebApplicationBuilder ConfigureUploadLimits(this WebApplicationBuilder builder)
     {
-        // Fall back to 500 MB if nothing is set in appsettings.
-        const long defaultMaxUploadBytes = 500L * 1024 * 1024; // 500 mb
-
         builder.Services
             .AddOptions<UploadLimitsOptions>()
             .Bind(builder.Configuration.GetSection(UploadLimitsOptions.SectionName));
@@ -41,7 +38,7 @@ public static class ServiceCollectionExtensions
         
         var maxUploadBytes = uploadLimits.MaxUploadBytes > 0
             ? uploadLimits.MaxUploadBytes
-            : defaultMaxUploadBytes;
+            : UploadLimitsOptions.DefaultMaxUploadBytes;
 
         // define max size for any file coming from rest api route,
         // and define that we can only save 64mb in the ram to nor overflow the ram

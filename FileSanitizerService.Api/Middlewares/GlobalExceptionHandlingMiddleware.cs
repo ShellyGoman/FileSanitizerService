@@ -58,8 +58,7 @@ public sealed class GlobalExceptionHandlingMiddleware
                 message,
                 context.Request.Method,
                 context.Request.Path);
-        
-        if (statusCode is HttpStatusCode.UnprocessableEntity)
+        else if (statusCode is HttpStatusCode.UnprocessableEntity)
             logger.LogError(
                 "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
                 response.StatusCode,
@@ -67,7 +66,6 @@ public sealed class GlobalExceptionHandlingMiddleware
                 message,
                 context.Request.Method,
                 context.Request.Path);
-        
         else
             logger.LogWarning(
                 "HTTP {StatusCode} - {ExceptionType}: {Message} for {Method} {Path}",
