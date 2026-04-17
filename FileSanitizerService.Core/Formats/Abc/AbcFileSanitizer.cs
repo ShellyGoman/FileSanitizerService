@@ -24,7 +24,6 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     public async Task SanitizeAsync(
         Stream input, Stream output, CancellationToken ct = default)
     {
-        await SkipHeaderAsync(input, ct);
         await output.WriteAsync(HeaderBytes, ct);
 
         var state = new ParserState();
@@ -40,13 +39,6 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         await output.WriteAsync(FooterBytes, ct);
     }
     
-    // Skips past the header line (already validated by HeaderDetector).
-    private static async Task SkipHeaderAsync(Stream input, CancellationToken ct)
-    {
-        var oneByte = new byte[1];
-        while (await input.ReadAsync(oneByte, ct) > 0 && oneByte[0] != (byte)'\n') { }
-    }
-
     // Processes one read buffer chunk and rejects trailing bytes after a completed footer.
     private static async Task ProcessChunkAsync(
         byte[] buffer,

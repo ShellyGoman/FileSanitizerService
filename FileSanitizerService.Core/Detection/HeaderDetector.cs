@@ -17,24 +17,30 @@ public sealed class HeaderDetector : IFormatDetector
 
     public async Task<FormatDetectionResult> DetectAsync(Stream stream, CancellationToken ct = default)
     {
-        var buffer = new byte[MaxHeaderLength];
-        var bytesRead = 
-            await stream.ReadAsync(buffer.AsMemory(0, MaxHeaderLength), ct);
-        if (bytesRead == 0)
+        var headerBytes = new List<byte>(MaxHeaderLength);
+        var oneByte = new byte[1];
+
+        while (headerBytes.Count < MaxHeaderLength && await stream.ReadAsync(oneByte, ct) > 0)
+        {
+            headerBytes.Add(oneByte[0]);
+            if (oneByte[0] == (byte)'\n')
+                break;
+        }
+
+        if (headerBytes.Count == 0)
             throw new ArgumentException("Uploaded file is empty.");
 
-        var prefetchedBytes = buffer.AsSpan(0, bytesRead).ToArray();
-        
-        // go through all headers formats exists in the system and check if one matches
+        var headerArray = headerBytes.ToArray();
+
         foreach (var (format, header) in Headers)
         {
-            if (bytesRead >= header.Length &&
-                buffer.AsSpan(0, header.Length).SequenceEqual(header))
+            if (headerArray.Length >= header.Length &&
+                headerArray.AsSpan(0, header.Length).SequenceEqual(header))
             {
-                return new FormatDetectionResult(format, prefetchedBytes);
+                return new FormatDetectionResult(format);
             }
         }
 
-        return new FormatDetectionResult(FileFormat.Unknown, prefetchedBytes);
+        return new FormatDetectionResult(FileFormat.Unknown);
     }
 }

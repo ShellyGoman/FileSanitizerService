@@ -62,7 +62,6 @@ public sealed class SanitizationService
             throw new ArgumentException($"No sanitizer found for format '{format}'.");
         }
 
-        await using var replayedInput = new PrefixReplayStream(detection.PrefetchedBytes, input);
-        await sanitizer.SanitizeAsync(replayedInput, output, ct);
+        await sanitizer.SanitizeAsync(input, output, ct);
     }
 }
