@@ -47,6 +47,7 @@ public class FileSanitizerController : ControllerBase
                 BodyLengthLimit = _maxUploadBytes,
                 HeadersLengthLimit = MultipartHeadersLengthLimit
             };
+            
             fileSection = await MultipartRequestHelper.FindFileSectionAsync(reader, ct);
             if (fileSection is null)
                 return BadRequest("No file provided or file is empty.");

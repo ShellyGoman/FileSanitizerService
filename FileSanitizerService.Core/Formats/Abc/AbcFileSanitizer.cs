@@ -1,3 +1,4 @@
+using System.Buffers;
 using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.Models;
 
@@ -5,7 +6,7 @@ namespace FileSanitizerService.Core.Formats.Abc;
 
 public sealed class AbcFileSanitizer : IFileSanitizer
 {
-    private const int ReadBufferSize = 4096;
+    private const int ReadBufferSize = 4096; // 4kb
     private const int BlockSize = 3;
     private const byte BlockStartByte = (byte)'A';
     private const byte BlockEndByte = (byte)'C';
@@ -32,31 +33,34 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         var state = new ParserState();
         var readBuf = new byte[ReadBufferSize];
+        var chunkOutputBuffer = new ArrayBufferWriter<byte>(ReadBufferSize * 2);
         int bytesRead;
-        
+
         while ((bytesRead = await input.ReadAsync(readBuf, ct)) > 0)
         {
-            await ProcessChunkAsync(readBuf, bytesRead, state, output, ct);
+            ProcessChunk(readBuf, bytesRead, state, chunkOutputBuffer);
+            
+            await output.WriteAsync(chunkOutputBuffer.WrittenMemory, ct);
+            chunkOutputBuffer.ResetWrittenCount();
         }
 
         EnsureCompletedState(state);
         await output.WriteAsync(FooterBytes, ct);
     }
-    
+
     // Processes one read buffer chunk and rejects trailing bytes after a completed footer.
-    private static async Task ProcessChunkAsync(
+    private static void ProcessChunk(
         byte[] buffer,
         int bytesRead,
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> chunkOutputBuffer)
     {
         if (state.IsFooterFullyRead)
             throw new InvalidOperationException("Unexpected bytes after footer '789'.");
 
         for (var index = 0; index < bytesRead; index++)
         {
-            await ProcessByteAsync(buffer[index], state, output, ct);
+            ProcessByte(buffer[index], state, chunkOutputBuffer);
 
             if (state.IsFooterFullyRead && index + 1 < bytesRead)
                 throw new InvalidOperationException("Unexpected bytes after footer '789'.");
@@ -64,11 +68,10 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     }
 
     // Routes each byte to footer, newline, or data-block handling.
-    private static async Task ProcessByteAsync(
+    private static void ProcessByte(
         byte currentByte,
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> chunkOutputBuffer)
     {
         if (currentByte == CarriageReturn)
         {
@@ -79,12 +82,12 @@ public sealed class AbcFileSanitizer : IFileSanitizer
         if (state.SeenCarriageReturn)
         {
             state.SeenCarriageReturn = false;
-            
+
             // after \r we expect to see \n only
             if (currentByte != LineFeed)
                 throw new InvalidOperationException(@"Invalid line ending: '\r' must be immediately followed by '\n'.");
 
-            await ProcessNewLineAsync(state, output, ct);
+            ProcessNewLine(state, chunkOutputBuffer);
             return;
         }
 
@@ -96,11 +99,11 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         if (currentByte == LineFeed)
         {
-            await ProcessNewLineAsync(state, output, ct);
+            ProcessNewLine(state, chunkOutputBuffer);
             return;
         }
 
-        await ProcessDataByteAsync(currentByte, state, output, ct);
+        ProcessDataByte(currentByte, state, chunkOutputBuffer);
     }
 
     // Decides whether the current byte should be interpreted as part of the footer.
@@ -128,10 +131,9 @@ public sealed class AbcFileSanitizer : IFileSanitizer
     }
 
     // Validates block boundaries on newline, writes it through, and enables footer detection.
-    private static async Task ProcessNewLineAsync(
+    private static void ProcessNewLine(
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> chunkOutputBuffer)
     {
         if (state.CurrentBlockByteCount != 0)
         {
@@ -139,34 +141,32 @@ public sealed class AbcFileSanitizer : IFileSanitizer
                 $"Invalid ABC file: newline encountered after {state.CurrentBlockByteCount} of {BlockSize} bytes in a block (incomplete A*C block).");
         }
 
-        await output.WriteAsync(NewLineByte, ct);
+        chunkOutputBuffer.Write(NewLineByte);
         state.ExpectingFooterStartAfterNewLine = true;
     }
 
     // Buffers data bytes into 3-byte blocks and emits each block when complete.
-    private static async Task ProcessDataByteAsync(
+    private static void ProcessDataByte(
         byte currentByte,
         ParserState state,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> chunkOutputBuffer)
     {
         state.ExpectingFooterStartAfterNewLine = false;
         state.CurrentBlockBytes[state.CurrentBlockByteCount++] = currentByte;
 
         // did not create yet the full block with the full length (3)
-        // need to wait fot the rest of the data
+        // need to wait for the rest of the data
         if (state.CurrentBlockByteCount < state.CurrentBlockBytes.Length)
             return;
 
-        await WriteSanitizedBlockAsync(state.CurrentBlockBytes, output, ct);
+        WriteSanitizedBlock(state.CurrentBlockBytes, chunkOutputBuffer);
         state.CurrentBlockByteCount = 0;
     }
 
     // Validates a full A*C block and writes either the original or replacement block.
-    private static async Task WriteSanitizedBlockAsync(
+    private static void WriteSanitizedBlock(
         byte[] blockBuffer,
-        Stream output,
-        CancellationToken ct)
+        ArrayBufferWriter<byte> chunkOutputBuffer)
     {
         if (blockBuffer[0] != BlockStartByte || blockBuffer[2] != BlockEndByte)
         {
@@ -177,9 +177,9 @@ public sealed class AbcFileSanitizer : IFileSanitizer
 
         byte dataByte = blockBuffer[1];
         if (dataByte is >= BenignMinByte and <= BenignMaxByte)
-            await output.WriteAsync(blockBuffer.AsMemory(0, BlockSize), ct);
+            chunkOutputBuffer.Write(blockBuffer.AsSpan(0, BlockSize));
         else
-            await output.WriteAsync(ReplacementBlock, ct);
+            chunkOutputBuffer.Write(ReplacementBlock);
     }
 
     // Verifies parsing ended in a valid terminal state and raises detailed structural errors.
