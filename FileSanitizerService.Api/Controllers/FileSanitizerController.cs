@@ -1,3 +1,4 @@
+using FileSanitizerService.Api.Exceptions;
 using FileSanitizerService.Api.Filters;
 using FileSanitizerService.Api.Options;
 using FileSanitizerService.Api.Utils;
@@ -38,7 +39,7 @@ public class FileSanitizerController : ControllerBase
             return BadRequest("Expected a multipart/form-data request.");
 
         FileMultipartSection? fileSection;
-        
+
         try
         {
             var boundary = MultipartRequestHelper.GetBoundary(contentType);
@@ -47,14 +48,14 @@ public class FileSanitizerController : ControllerBase
                 BodyLengthLimit = _maxUploadBytes,
                 HeadersLengthLimit = MultipartHeadersLengthLimit
             };
-            
+
             fileSection = await MultipartRequestHelper.FindFileSectionAsync(reader, ct);
             if (fileSection is null)
                 return BadRequest("No file provided or file is empty.");
         }
-        catch (ArgumentException ex)
+        catch (InvalidDataException)
         {
-            return BadRequest(ex.Message);
+            throw new FileTooLargeException();
         }
 
         var fileStream = fileSection.FileStream;

@@ -1,3 +1,4 @@
+using FileSanitizerService.Api.Exceptions;
 using FileSanitizerService.Core.Exceptions;
 using System.Text.Json;
 
@@ -58,6 +59,8 @@ public sealed class GlobalExceptionHandlingMiddleware
     {
         UnsupportedFormatException => (StatusCodes.Status400BadRequest, "Bad Request", ex.Message, LogLevel.Warning),
         InvalidFileStructureException => (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity", ex.Message, LogLevel.Warning),
+        ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", ex.Message, LogLevel.Warning),
+        FileTooLargeException => (StatusCodes.Status413RequestEntityTooLarge, "Request Entity Too Large", ex.Message, LogLevel.Warning),
         BadHttpRequestException => (StatusCodes.Status400BadRequest, "Bad Request", "Invalid HTTP request.", LogLevel.Warning),
         OperationCanceledException => (499, "Client Closed Request", "Request was canceled.", LogLevel.Information),
         _ => (StatusCodes.Status500InternalServerError, "Internal Server Error", "Unexpected error.", LogLevel.Error),
