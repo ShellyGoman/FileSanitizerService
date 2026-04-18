@@ -5,7 +5,6 @@ using FileSanitizerService.Core.Interfaces;
 using FileSanitizerService.Core.SanitizerFormatResolver;
 using FileSanitizerService.Core.Services;
 using FileSanitizerService.Infrastructure.Services;
-using Microsoft.AspNetCore.Http.Features;
 
 namespace FileSanitizerService.Api.Extensions;
 
