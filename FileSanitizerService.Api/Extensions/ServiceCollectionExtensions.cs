@@ -40,17 +40,7 @@ public static class ServiceCollectionExtensions
             ? uploadLimits.MaxUploadBytes
             : UploadLimitsOptions.DefaultMaxUploadBytes;
 
-        // define max size for any file coming from rest api route,
-        // and define that we can only save 64mb in the ram to nor overflow the ram
-        // (the rest is written to tmp file on the disk)
-        builder.Services.Configure<FormOptions>(options =>
-        {
-            options.MultipartBodyLengthLimit = maxUploadBytes;
-            options.MemoryBufferThreshold = 64 * 1024;
-        });
-
-        // Kestrel needs to know the same limit, otherwise it'll cut the connection
-        // before the route even gets to read the body.
+        // transport-level limit to reject oversized requests before they reach the pipeline.
         builder.WebHost.ConfigureKestrel(options =>
         {
             options.Limits.MaxRequestBodySize = maxUploadBytes;
