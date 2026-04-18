@@ -1,16 +1,22 @@
 ﻿# File Sanitizer Service
 
-A REST API microservice that accepts a file upload, detects its format, sanitizes any malicious content, and returns the clean file as a download.
+A REST API microservice that accepts a file upload, detects its format,
+sanitizes any malicious content, and returns the clean file as a download.
 
-Currently supports the **ABC format** - a format with a header, data blocks, and a footer. The architecture is built so adding new formats is straightforward.
+Currently supports the **ABC format** - a format with a header, data blocks,
+and a footer. The architecture is built so adding new formats is straightforward.
 
 ---
 
 ## How it works
 
-The service reads the file in a **single streaming pass** - it never loads the whole thing into memory. This means it handles very large files (500 MB by default) without breaking a sweat. Each data block is validated on the fly, malicious bytes get replaced, and the sanitized content is written out as it goes.
+The service reads the file in a **single streaming pass** - 
+it never loads the whole thing into memory, this means it handles large files 
+(500 MB by default). Each data block is validated on the fly,
+malicious bytes get replaced, and the sanitized content is written out as it goes.
 
-ABC files are made up of 3-byte blocks (`A<byte>C`). Any block where the middle byte isn't a digit (`1`–`9`) is considered malicious and gets replaced with `A255C`.
+ABC files are made up of 3-byte blocks (`A<byte>C`). Any block where the middle byte
+isn't a digit (`1`–`9`) is considered malicious and the whole block gets replaced with `A255C`.
 
 ---
 
