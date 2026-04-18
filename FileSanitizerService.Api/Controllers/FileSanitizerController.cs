@@ -38,25 +38,16 @@ public class FileSanitizerController : ControllerBase
         if (!MultipartRequestHelper.TryGetMultipartContentType(Request.ContentType, out var contentType))
             return BadRequest("Expected a multipart/form-data request.");
 
-        FileMultipartSection? fileSection;
-
-        try
+        var boundary = MultipartRequestHelper.GetBoundary(contentType);
+        var reader = new MultipartReader(boundary, Request.Body)
         {
-            var boundary = MultipartRequestHelper.GetBoundary(contentType);
-            var reader = new MultipartReader(boundary, Request.Body)
-            {
-                BodyLengthLimit = _maxUploadBytes,
-                HeadersLengthLimit = MultipartHeadersLengthLimit
-            };
+            BodyLengthLimit = _maxUploadBytes,
+            HeadersLengthLimit = MultipartHeadersLengthLimit
+        };
 
-            fileSection = await MultipartRequestHelper.FindFileSectionAsync(reader, ct);
-            if (fileSection is null)
-                return BadRequest("No file provided or file is empty.");
-        }
-        catch (InvalidDataException)
-        {
-            throw new FileTooLargeException();
-        }
+        var fileSection = await MultipartRequestHelper.FindFileSectionAsync(reader, ct);
+        if (fileSection is null)
+            return BadRequest("No file provided or file is empty.");
 
         var fileStream = fileSection.FileStream;
         if (fileStream is null)
@@ -66,7 +57,16 @@ public class FileSanitizerController : ControllerBase
 
         _logger.LogInformation("Sanitize request received for '{FileName}'", fileName);
 
-        var sanitizedStream = await _service.SanitizeToTempFileAsync(fileStream, fileName, ct);
+        Stream sanitizedStream;
+        try
+        {
+            sanitizedStream = await _service.SanitizeToTempFileAsync(fileStream, fileName, ct);
+        }
+        catch (InvalidDataException)
+        {
+            throw new FileTooLargeException();
+        }
+
         HttpContext.Response.RegisterForDispose(sanitizedStream);
 
         _logger.LogInformation("Sanitization complete for '{FileName}'", fileName);
